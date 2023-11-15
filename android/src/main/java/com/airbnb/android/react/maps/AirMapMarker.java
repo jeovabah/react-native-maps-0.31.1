@@ -304,22 +304,28 @@ public class AirMapMarker extends AirMapFeature {
     return new LatLng(lat, lng);
   }
 
-  public void animateToCoodinate(LatLng finalPosition, Integer duration) {
-    TypeEvaluator<LatLng> typeEvaluator = new TypeEvaluator<LatLng>() {
-      @Override
-      public LatLng evaluate(float fraction, LatLng startValue, LatLng endValue) {
-        return interpolate(fraction, startValue, endValue);
-      }
-    };
-    Property<Marker, LatLng> property = Property.of(Marker.class, LatLng.class, "position");
-    ObjectAnimator animator = ObjectAnimator.ofObject(
-      marker,
-      property,
-      typeEvaluator,
-      finalPosition);
-    animator.setDuration(duration);
-    animator.start();
+public void animateToCoordinate(LatLng finalPosition, Integer duration) {
+  if(finalPosition == null || marker == null) {
+    // Log an error or handle it as per your app's requirements
+    return; // Cancela a operação se a posição final ou o marcador for nulo
   }
+
+  TypeEvaluator<LatLng> typeEvaluator = new TypeEvaluator<LatLng>() {
+    @Override
+    public LatLng evaluate(float fraction, LatLng startValue, LatLng endValue) {
+      return interpolate(fraction, startValue, endValue);
+    }
+  };
+  Property<Marker, LatLng> property = Property.of(Marker.class, LatLng.class, "position");
+  ObjectAnimator animator = ObjectAnimator.ofObject(
+    marker,
+    property,
+    typeEvaluator,
+    finalPosition);
+  animator.setDuration(duration);
+  animator.start();
+}
+
 
   public void setImage(String uri) {
     hasViewChanges = true;
