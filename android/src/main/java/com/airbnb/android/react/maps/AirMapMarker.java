@@ -304,7 +304,7 @@ public class AirMapMarker extends AirMapFeature {
     return new LatLng(lat, lng);
   }
 
-public void animateToCoordinate(LatLng finalPosition, Integer duration) {
+public void animateToCoodinate(LatLng finalPosition, Integer duration) {
   if(finalPosition == null || marker == null) {
     // Log an error or handle it as per your app's requirements
     return; // Cancela a operação se a posição final ou o marcador for nulo
