@@ -85,40 +85,57 @@ public class AirMapMarker extends AirMapFeature {
   private final DraweeHolder<?> logoHolder;
   private DataSource<CloseableReference<CloseableImage>> dataSource;
   private final ControllerListener<ImageInfo> mLogoControllerListener =
-      new BaseControllerListener<ImageInfo>() {
+    new BaseControllerListener<ImageInfo>() {
         @Override
-        public void onFinalImageSet(
-            String id,
-            @Nullable final ImageInfo imageInfo,
-            @Nullable Animatable animatable) {
-          CloseableReference<CloseableImage> imageReference = null;
-          try {
-            imageReference = dataSource.getResult();
-            if (imageReference != null) {
-              CloseableImage image = imageReference.get();
-              if (image != null && image instanceof CloseableStaticBitmap) {
-                CloseableStaticBitmap closeableStaticBitmap = (CloseableStaticBitmap) image;
-                Bitmap bitmap = closeableStaticBitmap.getUnderlyingBitmap();
-                if (bitmap != null) {
-                  bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
-                  iconBitmap = bitmap;
-                  iconBitmapDescriptor = BitmapDescriptorFactory.fromBitmap(bitmap);
+        public void onFinalImageSet(String id, @Nullable ImageInfo imageInfo, @Nullable Animatable animatable) {
+            CloseableReference<CloseableImage> imageReference = null;
+            try {
+                imageReference = dataSource.getResult();
+                if (imageReference != null) {
+                    CloseableImage image = imageReference.get();
+                    if (image instanceof CloseableStaticBitmap) {
+                        CloseableStaticBitmap closeableStaticBitmap = (CloseableStaticBitmap) image;
+                        Bitmap bitmap = closeableStaticBitmap.getUnderlyingBitmap();
+                        if (bitmap != null) {
+                            bitmap = Bitmap.createScaledBitmap(bitmap, 1024, 1024, true); // Redimensionar se necessário
+                            iconBitmap = bitmap;
+                            iconBitmapDescriptor = BitmapDescriptorFactory.fromBitmap(bitmap);
+                        }
+                    }
                 }
-              }
+            } catch (Exception e) {
+                // Log do erro
+            } finally {
+                if (imageReference != null) {
+                    CloseableReference.closeSafely(imageReference);
+                }
             }
-          } finally {
-            dataSource.close();
-            if (imageReference != null) {
-              CloseableReference.closeSafely(imageReference);
+            if (AirMapMarker.this.markerManager != null && AirMapMarker.this.imageUri != null) {
+                AirMapMarker.this.markerManager.getSharedIcon(AirMapMarker.this.imageUri)
+                    .updateIcon(iconBitmapDescriptor, iconBitmap);
             }
-          }
-          if (AirMapMarker.this.markerManager != null && AirMapMarker.this.imageUri != null) {
-            AirMapMarker.this.markerManager.getSharedIcon(AirMapMarker.this.imageUri)
-                .updateIcon(iconBitmapDescriptor, iconBitmap);
-          }
-          update(true);
+            update(true);
         }
-      };
+    };
+private Bitmap resizeBitmap(Bitmap bitmap, int maxWidth, int maxHeight) {
+    int width = bitmap.getWidth();
+    int height = bitmap.getHeight();
+
+    if (width <= maxWidth && height <= maxHeight) {
+        return bitmap; // No need to resize
+    }
+
+    float bitmapRatio = (float)width / (float)height;
+    if (bitmapRatio > 1) {
+        width = maxWidth;
+        height = (int) (width / bitmapRatio);
+    } else {
+        height = maxHeight;
+        width = (int) (height * bitmapRatio);
+    }
+
+    return Bitmap.createScaledBitmap(bitmap, width, height, true);
+}
 
   public AirMapMarker(Context context, AirMapMarkerManager markerManager) {
     super(context);
@@ -352,45 +369,29 @@ public void animateToCoodinate(LatLng finalPosition, Integer duration) {
       }
     }
 
-    this.imageUri = uri;
-    if (!shouldLoadImage) {return;}
+   this.imageUri = uri;
+    if (!shouldLoadImage) return;
 
     if (uri == null) {
-      iconBitmapDescriptor = null;
-      update(true);
-    } else if (uri.startsWith("http://") || uri.startsWith("https://") ||
-        uri.startsWith("file://") || uri.startsWith("asset://") || uri.startsWith("data:")) {
-      ImageRequest imageRequest = ImageRequestBuilder
-          .newBuilderWithSource(Uri.parse(uri))
-          .build();
-
-      ImagePipeline imagePipeline = Fresco.getImagePipeline();
-      dataSource = imagePipeline.fetchDecodedImage(imageRequest, this);
-      DraweeController controller = Fresco.newDraweeControllerBuilder()
-          .setImageRequest(imageRequest)
-          .setControllerListener(mLogoControllerListener)
-          .setOldController(logoHolder.getController())
-          .build();
-      logoHolder.setController(controller);
+        iconBitmapDescriptor = null;
     } else {
-      iconBitmapDescriptor = getBitmapDescriptorByName(uri);
-      if (iconBitmapDescriptor != null) {
-          int drawableId = getDrawableResourceByName(uri);
-          iconBitmap = BitmapFactory.decodeResource(getResources(), drawableId);
-          if (iconBitmap == null) { // VectorDrawable or similar
-              Drawable drawable = getResources().getDrawable(drawableId);
-              iconBitmap = Bitmap.createBitmap(drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
-              drawable.setBounds(0, 0, drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight());
-              Canvas canvas = new Canvas(iconBitmap);
-              drawable.draw(canvas);
-          }
-      }
-      if (this.markerManager != null && uri != null) {
-        this.markerManager.getSharedIcon(uri).updateIcon(iconBitmapDescriptor, iconBitmap);
-      }
-      update(true);
+        try {
+            ImageRequest imageRequest = ImageRequestBuilder.newBuilderWithSource(Uri.parse(uri)).build();
+            ImagePipeline imagePipeline = Fresco.getImagePipeline();
+            dataSource = imagePipeline.fetchDecodedImage(imageRequest, this);
+            DraweeController controller = Fresco.newDraweeControllerBuilder()
+                .setImageRequest(imageRequest)
+                .setControllerListener(mLogoControllerListener)
+                .setOldController(logoHolder.getController())
+                .build();
+            logoHolder.setController(controller);
+        } catch (Exception e) {
+            // Log do erro
+        }
     }
-  }
+
+    update(true);
+    }
 
   public void setIconBitmapDescriptor(BitmapDescriptor bitmapDescriptor, Bitmap bitmap) {
     this.iconBitmapDescriptor = bitmapDescriptor;
@@ -500,11 +501,12 @@ public void animateToCoodinate(LatLng finalPosition, Integer duration) {
 
   public void update(boolean updateIcon) {
     if (marker == null) {
-      return;
+        return;
     }
 
-    if (updateIcon)
-      updateMarkerIcon();
+    if (updateIcon) {
+        updateMarkerIcon();
+    }
 
     if (anchorIsSet) {
       marker.setAnchor(anchorX, anchorY);
