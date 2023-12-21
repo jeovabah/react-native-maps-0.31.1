@@ -120,6 +120,13 @@ public class AirMapMarker extends AirMapFeature {
         }
       };
 
+  private void recycleBitmap() {
+    if (iconBitmap != null && !iconBitmap.isRecycled()) {
+        iconBitmap.recycle();
+    }
+    iconBitmap = null;
+  }
+
   public AirMapMarker(Context context, AirMapMarkerManager markerManager) {
     super(context);
     this.context = context;
@@ -330,6 +337,8 @@ public void animateToCoodinate(LatLng finalPosition, Integer duration) {
   public void setImage(String uri) {
     hasViewChanges = true;
 
+    recycleBitmap();
+
     boolean shouldLoadImage = true;
 
     if (this.markerManager != null) {
@@ -450,14 +459,15 @@ public void animateToCoodinate(LatLng finalPosition, Integer duration) {
   }
 
   @Override
-  public void removeFromMap(GoogleMap map) {
-    if (marker == null) {
-      return;
+public void removeFromMap(GoogleMap map) {
+    if (marker != null) {
+        marker.remove();
+        marker = null;
+        recycleBitmap();  // Recicle o bitmap quando o marcador for removido
+        updateTracksViewChanges(); // Mantenha a lógica existente para atualizar o estado dos marcadores
     }
-    marker.remove();
-    marker = null;
-    updateTracksViewChanges();
-  }
+}
+
 
   private BitmapDescriptor getIcon() {
     if (hasCustomMarkerView) {
